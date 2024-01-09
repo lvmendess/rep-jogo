@@ -1,20 +1,11 @@
 /**
- *  This class is the main class of the "World of Zuul" application. 
- *  "World of Zuul" is a very simple, text based adventure game.  Users 
- *  can walk around some scenery. That's all. It should really be extended 
- *  to make it more interesting!
- * 
- *  To play this game, create an instance of this class and call the "play"
- *  method.
- * 
  *  This main class creates and initialises all the others: it creates all
  *  rooms, creates the parser and starts the game.  It also evaluates and
  *  executes the commands that the parser returns.
  * 
- * @author  Michael Kölling and David J. Barnes
- * @version 2016.02.29
+ * @author Lívia Mendes e Paulo Moura
+ * @version 2024.01.08
  */
-import java.io.PrintWriter;
 import java.util.*;
 public class Game 
 {
@@ -24,6 +15,10 @@ public class Game
     private Mime mime;
     private Random probability = new Random();
     private boolean wantToQuit;
+    private ArrayList<Room> rooms = new ArrayList<>();
+    private ArrayList<Ending> endings = new ArrayList<>();
+    private int endingIndex;
+    private String gameEnding;
         
     /**
      * Create the game and initialise its internal map.
@@ -31,23 +26,52 @@ public class Game
     public Game() 
     {
         createRooms();
+        createEndings();
         parser = new Parser();
+        endingIndex = probability.nextInt(0, endings.size()); //not working, needs to be fixed
+        gameEnding = endings.get(endingIndex).getEnding(endingIndex);
+    }
+
+    /*
+     * Create game endings
+     */
+    private void createEndings() {
+        Ending end1, end2, end3;
+
+        end1 = new Ending("you wake up in your bed, it was all a dream");
+        end2 = new Ending(
+                "you wake up in your bed, it was all a nightmare \n until you look into the mirror and you don't see yourself \n you see the mime");
+        end3 = new Ending(
+                "you see the mime sitting in a cute chair while drinking a little tea \n and it kindly offers you some");
+
+        endings.add(end1);
+        endings.add(end2);
+        endings.add(end3);
     }
 
     /**
-     * Create all the rooms and link their exits together.
+     * Create all the rooms, link their exits together, create and add its items and/or characters.
      */
     private void createRooms()
     {
-        Room room1, room2, room3, room4;  
+        Room room1, room2, room3, room4, endRoom;
       
-        /*1st level */
         // create the rooms
-        room1 = new Room("at the lounge", true);
-        room2 = new Room("at the living room", false);
-        room3 = new Room("at the kitchen", false);
-        room4 = new Room("at the bedroom", false);
+        room1 = new Room("at the lounge", true, false, false);
+        room2 = new Room("at the living room", false, false,false);
+        room3 = new Room("at the kitchen", false, false, false);
+        room4 = new Room("at the bedroom", false, false, false);
+        endRoom = new Room(gameEnding, false, true, true);
+
+        rooms.add(room1);
+        rooms.add(room2);
+        rooms.add(room3);
+        rooms.add(room4);
+        rooms.add(endRoom);
+
         // initialise room exits
+        room1.setExit("south", endRoom);
+
         room1.setExit("north", room2);
         room2.setExit("south", room1);
         room2.setExit("east", room3);
@@ -56,10 +80,16 @@ public class Game
         room4.setExit("north", room3);
         room4.setExit("south", room1);
 
-        //add items
-        room1.addItem("shotgun", "a lightweight short-range shotgun", 0.632, 100, 50.0, 1);
 
-        
+
+        //add items
+        room1.addItem("shotgun", "a lightweight short-range shotgun", 0.632, 6, 100.0, 1);
+        room1.addItem("grenade", "a grenade", 0.210, 1, 100000, 3);
+        room1.addItem("knife", "a tactical knife", 0.04, 1000, 25, 1);
+        room1.addItem("ammunition", "a six bullet ammunition clip, use wisely", 0.5, 6, 0, 2);
+        room1.addItem("mirror", "a oval shaped mirror, you can use it to confuse the mime", 0.1, 3, 500, 4);
+
+
         //add mime
         mime = new Mime(room4); // creates the mime and adds it to initial room
 
@@ -86,21 +116,29 @@ public class Game
     }
 
     /**
-     * Print out the opening message for the player.
+     * Print out player's current room information(description and/or items, exits and characters).
      */
 
     private void printLocationInfo() { //tarefa 2
-        System.out.println(player.getCurrentRoom().getLongDescription());
-        System.out.println();
+        if (player.getCurrentRoom().isFinal()) {
+            System.out.println(player.getCurrentRoom().getDescription());
+        } else {
+            System.out.println(player.getCurrentRoom().getLongDescription());
+            System.out.println();
+        }
     }
 
+    /**
+     * Print out the opening message for the player.
+     */
     private void printWelcome()
     {
         System.out.println();
-        System.out.println("Welcome to the World of Zuul!");
-        System.out.println("World of Zuul is a new, incredibly boring adventure game.");
-        System.out.println("Type 'help' if you need help.");
-        System.out.println();
+        System.out.println("Welcome to The Mime!");
+        System.out.println(
+                "You are a SCP agent and it's your duty to investigate this house due to reports of abnormal activity");
+        printHelp();
+        System.out.print("Type 'help' if you need to see which commands you have again.");
         printLocationInfo();//tarefa 2
     }
 
@@ -164,9 +202,6 @@ public class Game
      */
     private void printHelp() 
     {
-        System.out.println("You are lost. You are alone. You wander");
-        System.out.println("around at the university.");
-        System.out.println();
         System.out.println("Your command words are:");
         parser.showCommands();
     }
@@ -199,73 +234,101 @@ public class Game
                     mime.metPlayer();
                 }
                 player.move(nextRoom);
-                mime.move();
+                if (mime.getHealth() > 0) {
+                    mime.move();
+                }
                 if (player.getCurrentRoom().isInitial()) {
                     System.out.println("You hear the door lock itself behind you. You can't go back from here");
+                }
+                if (player.getCurrentRoom().isFinal()) {
+                    wantToQuit = true;
                 }
             }
         }
         printLocationInfo();
     }
     
+    /*
+     * Type attack to attack the Mime
+     * by default, uses the player's currently wielded item to do so but it has to be either a firearm or a knife,
+     * both of which behave the same way (with a few exceptions)
+     */
     private void attack(Command command) {
         if (command.hasSecondWord()) {
             System.out.println("i know it's to attack the mime, you don't need to tell me");
         }
-        if (player.getWieldingItem() != null) {
-            double prob = Math.abs(probability.nextGaussian())/2;
-            if (prob > mime.getDefense()) {
-                if (player.getAttackStreak() > 2 && player.getAttackStreak() <= 3) {
-                    mime.takeDamage(player.getWieldingItem().getDamage()*player.getAttackStreak());
-                } else {
-                    mime.takeDamage(player.getWieldingItem().getDamage());
-                }
-                player.addAttackStreak();// adds 1 to the attackStreak every time the player successfully attacks the mime
-                System.out.println("You attacked the mime.");
+        if (player.getWieldingItem() != null) { //checks whether the player is wielding an item
+            if (player.getWieldingItem().getItemCode() != 1) {
+                System.out.println("you need a firearm to attack");
             } else {
-                System.out.println("You missed.");
-                player.resetAttackStreak();
-            }
-            try {
-                Thread.sleep(500); //tempo que o mime "espera" antes de atacar o player
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            if (mime.getHealth() > 0) {
-                prob = Math.abs(probability.nextGaussian());
-                if (prob > player.getDefense()) {
-                    mime.addAttackStreak(); //adds 1 to the mime's attack streak every time it successfully attacks the player
-                    System.out.println("The mime attacked you.");
-                    player.takeDamage(mime.getAttack());
+                getBehavior(1);
+                double prob = Math.abs(probability.nextGaussian()) / 2;
+                if (prob > mime.getDefense()) {
+                    if (player.getAttackStreak() > 2 && player.getAttackStreak() <= 3) {
+                        mime.takeDamage(player.getWieldingItem().getDamage() * player.getAttackStreak());
+                    } else {
+                        mime.takeDamage(player.getWieldingItem().getDamage());
+                    }
+                    player.addAttackStreak();// adds 1 to the attackStreak every time the player successfully attacks the mime
+                    System.out.println("You attacked the mime.");
                 } else {
-                    System.out.println("the mime tried to attack you, but missed");
-                    mime.resetAttackStreak();
+                    System.out.println("You missed.");
+                    player.resetAttackStreak();
                 }
-            }
-            System.out.println(allHealthStatus());
-            if (mime.getHealth() == 0) {
-                playerWon();
-            }
-            if (player.getHealth() == 0) {
-                playerDied();
+                try {
+                    Thread.sleep(500); //tempo que o mime "espera" antes de atacar o player
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                if (mime.getHealth() > 0) {
+                    prob = Math.abs(probability.nextGaussian());
+                    if (prob > player.getDefense()) {
+                        mime.addAttackStreak(); //adds 1 to the mime's attack streak every time it successfully attacks the player
+                        System.out.println("The mime attacked you.");
+                        player.takeDamage(mime.getAttack());
+                    } else {
+                        System.out.println("the mime tried to attack you, but missed");
+                        mime.resetAttackStreak();
+                    }
+                }
+                System.out.println(allHealthStatus());
+                if (mime.getHealth() == 0) {
+                    playerWon();
+                }
+                if (player.getHealth() == 0) {
+                    playerDied();
+                }
             }
         } else {
             System.out.println("You can't attack without wielding anything.");
         }
     }
 
+    /*
+     * command for all non-attacking item
+     * such as ammunition clip, mirror, food, etc
+     * player doesn't have to necessarily wield the item use unless defined in the item's behavior
+     */
     private void use(Command command){
         if (!command.hasSecondWord()) {
             System.out.println("use what?");
         } else {
             String itemName = command.getSecondWord();
-            if(player.ownsItem(itemName)){
-                getBehavior(player.getItem(itemName).getItemCode());
+            if (player.ownsItem(itemName)) {
+                if (player.getItem(itemName).getItemCode() != 1) {
+                    getBehavior(player.getItem(itemName).getItemCode());
+                } else {
+                    System.out.println("type attack to use a firearm or a knife, but you need to wield it first");  
+                }
+                
             }
         }
     }
 
+    /*
+     * Command to wield an item from the player's inventory
+     */
     private void wieldItem(Command command) {
         if (!command.hasSecondWord()) {
             System.out.println("wield what?");
@@ -316,6 +379,11 @@ public class Game
         }
     }
 
+    /*
+     * adds item to the player's inventory
+     * if the item specified in the argument exists in the player's current room
+     * removing it from the room once its taken
+     */
     private void take(Command command) {
         if (!command.hasSecondWord()) {
             System.out.println("take what?");
@@ -334,6 +402,11 @@ public class Game
         }
     }
 
+    /*
+     * adds item to the room
+     * if the item specified in the argument exists in the player's inventory
+     * removing it from the inventory once its dropped
+     */
     private void drop(Command command) {
         if (!command.hasSecondWord()) {
             System.out.println("drop what?");
@@ -350,6 +423,9 @@ public class Game
         }
     }
 
+    /*
+     * @returns the character/player's healthbar in a graphic form
+     */
     private String healthBar(double health) {
         String healthBar = "[";
         for (int i = 0; i <= 1000; i += 100) {
@@ -363,49 +439,95 @@ public class Game
         return healthBar;
     }
 
+    /*
+     * takes the graphic from healthBar() and returns it to be printed
+     * during combat
+     */
     private String allHealthStatus() {
         return "Your health:   " + healthBar(player.getHealth()) + "\n" + "Mime's health: " + healthBar(mime.getHealth()) + "\n";
     }
     
+    /*
+     * message deployed if the player dies during combat
+     * quits the game
+     */
     private void playerDied() {
         System.out.println("you died");
         wantToQuit = true;
     }
     
+    /*
+     * if the player defeats the Mime, it drops a key to the locked door for the player
+     * which results in one of the endings created in createEndings()
+     */
     private void playerWon() {
-        System.out.println("you've sucessfully defeated the mime");
-        wantToQuit = true;
+        System.out.println("you've sucessfully defeated the mime and it may have dropped something for you, take a look");
+        Item key = new Item("key", "a golden key appeared on the floor, you can use it to unlock a certain door", 0.05, 1, 0, 5);
+        player.getCurrentRoom().addItem("key", key);
     }
 
+    /*
+     * where each item has its behavior defined and assigned by its code
+     */
     public void getBehavior(int itemCode){
         switch(itemCode){
-            case 1: //armas
+            case 1: //firearms and knives
                 player.getWieldingItem().changeLifespan(-1);
                 break;
-            case 2: //munição
-                player.getWieldingItem().changeLifespan(6);
+            case 2: //ammunition clip
+                if (player.getWieldingItem().getItemCode() == 1) {
+                    if (player.getWieldingItem().getItemLifespan() > 0) {
+                        System.out.println("you don't need to reload now, save your ammunition for later");
+                    } else {
+                        player.getWieldingItem().changeLifespan(6);
+                        player.getItem("ammunition").changeLifespan(-6);
+                        player.removeFromInventory("ammunition");
+                        System.out.println("your "+player.getWieldingItem().getItemName()+" has been reloaded");
+                    }
+                }
                 break;
-            case 3: //granada
-                System.out.println("you're a dummy and you exploded yourself. congratulations!");
-                playerDied();
+            case 3: //grenade
+                if (player.getWieldingItem().getItemCode() == itemCode) {
+                    System.out.println("you're a dummy and you exploded yourself. congratulations!");
+                    player.removeFromInventory(player.getWieldingItem().getItemName());
+                    playerDied();
+                } else {
+                    System.out.println("you need to wield this item to use it");
+                }
                 break;
-            case 4: //lanterna
-
+            case 4: //flashlight and mirror
+                if (player.getWieldingItem().getItemCode() == itemCode) {
+                    if (player.getCurrentRoom().equals(mime.getCurrentRoom())) {
+                        double x = player.getWieldingItem().getDamage() / 1000;
+                        player.getWieldingItem().changeLifespan(-1);
+                        mime.setDefense(-x);
+                        System.out.println("it looks like the mime got dizzy, attacking it might be easier now");
+                        if (player.getWieldingItem().getItemLifespan() == 0) {
+                            player.removeFromInventory(player.getWieldingItem().getItemName());
+                            System.out.println(player.getWieldingItem().getItemName() + " broke");
+                            player.setWieldingItem(null);
+                        }
+                    } else {
+                        System.out.println("chill out, the mime isn't here right now");
+                    }
+                } else {
+                    System.out.println("you need to wield this item to use it");
+                }
                 break;
-            case 5:
-
+            case 5: //key
+                if (player.getWieldingItem().getItemCode() == itemCode) {
+                    for (Room room : rooms) {
+                        if (room.isLocked()) {
+                            room.unlockRoom();
+                        }
+                    }
+                    player.removeFromInventory(player.getWieldingItem().getItemName());
+                } else {
+                    System.out.println("you need to wield this item to use it");
+                }
                 break;
-            case 6:
-
-                break;
-
-            case 7:
-
-                break;
-
-            case 8:
-
-                break;
+            default:
+                attack(null);
         }
     }
 

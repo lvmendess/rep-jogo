@@ -22,6 +22,9 @@ public class Room
     private Map<String, Room> exits = new HashMap<>();
     private HashMap<String, Item> items = new HashMap<>();
     private ArrayList<Character> characters = new ArrayList<>();
+    private boolean locked;
+
+    private boolean finale;
 
     /**
      * Create a room described "description". Initially, it has
@@ -29,16 +32,26 @@ public class Room
      * "an open court yard".
      * @param description The room's description.
      */
-    public Room(String description, boolean isInitial) 
+    public Room(String description, boolean isInitial, boolean isLocked, boolean isFinal) 
     {
         this.description = description;
         initialRoom = isInitial;
+        locked = isLocked;
+        finale = isFinal;
+    }
 
+    public boolean isFinal() {
+        return finale;
     }
 
     public boolean isInitial() {
         return initialRoom;
     }
+
+    public boolean isLocked() {
+        return locked;
+    }
+
     /**
      * Define the exits of this room.  Every direction either leads
      * to another room or is null (no exit there).
@@ -69,7 +82,11 @@ public class Room
         Room sala = null;
         for (String key : exits.keySet()) {
             if (key.equals(direction)) {
-                sala = exits.get(direction);
+                if (exits.get(direction).isLocked()) {
+                    System.out.println("this door is locked, you need a key to open it");
+                } else {
+                    sala = exits.get(direction);
+                }
             }
         }
         return sala;
@@ -142,15 +159,14 @@ public class Room
         characters.remove(character);
     }
     
-    /*public void unlockRoom(Item tool) { //open hidden room
-        if (hidden) {
-            while (tool.equals(openingTool) == false) {
-                System.out.println("this tool cannot open the room, find something else");
-            }
-            hidden = false;
-            System.out.println(getLongDescription());
+    public void unlockRoom() { //open hidden room
+        if (locked) {
+            locked = false;
+            System.out.println("a door has been unlocked");
+        } else {
+            System.out.println("this room isn't locked, you silly");
         }
-    }*/
+    }
 
     public boolean itemExists(String itemName){
         boolean exists = false;
